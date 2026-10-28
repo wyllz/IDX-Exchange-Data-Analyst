@@ -1,5 +1,4 @@
 import os
-
 import pandas as pd
 
 DATA_DIR = "data/processed"
@@ -13,7 +12,7 @@ IQR_MULTIPLIER = 1.5
 pd.set_option("display.float_format", "{:,.2f}".format)
 pd.set_option("display.width", 200)
 
-
+# iqr for lower/upper cutoff for one numeric column
 def iqr_bounds(series):
     """Q1, Q3, IQR and the lower/upper cut-offs for one numeric column."""
     s = series.dropna()
@@ -89,7 +88,7 @@ def main():
     print(comparison.to_string())
     comparison.to_csv(os.path.join(DATA_DIR, "outlier_comparison.csv"))
 
-    # Written comparison for the deliverable
+    # written comparison for the deliverable
     removed = len(df) - len(filtered)
     cp = comparison.loc["ClosePrice"]
     lines = [
