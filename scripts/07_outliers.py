@@ -1,3 +1,31 @@
+'''
+Week 7: Outlier Detection and Data Quality
+
+Flags extreme values with the Interquartile Range (IQR) method instead of
+deleting them, filtering in different tiers.
+
+    Tier 1  Business rules: impossible values (ClosePrice <= 0 etc.) were already
+          removed in Weeks 4-5, so every row here is a possible real sale.
+    Tier 2  IQR flags on the required fields ClosePrice, LivingArea, DaysOnMarket,
+          plus price_per_sqft and close_to_original_list_ratio (also named in the
+          handbook as fields where extremes distort averages).
+          Outside [Q1 - 1.5 x IQR, Q3 + 1.5 x IQR] = outlier.
+    Tier 3  Percentiles alongside IQR: each field's 1st and 99th percentiles are
+          printed next to its IQR bounds, so the cut can be sanity-checked.
+
+The filtered analysis dataset removes rows flagged on any of the three required
+fields. The two extra fields are flagged only, so they can be used as optional
+filters in Tableau without shrinking the main dataset further.
+
+
+Outputs: (data/processed/):
+    - sold_outliers_flagged.csv   every row, with the outlier flag columns
+    - sold_analysis_filtered.csv  rows with no outlier on the required fields
+    - outlier_bounds.csv          Q1, Q3, IQR, bounds and percentiles per field
+    - outlier_comparison.csv      size and medians before vs. after filtering
+    - outlier_report.txt          the written comparison (also printed
+'''
+
 import os
 import pandas as pd
 

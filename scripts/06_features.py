@@ -1,3 +1,27 @@
+'''
+Week 6: Feature Engineering and Market Metrics
+
+Builds the market metrics that power the Tableau dashboards, on the cleaned sold data
+from Week 4-5
+
+Metric                        Formula
+  price_ratio                   ClosePrice / ListPrice
+  close_to_original_list_ratio  ClosePrice / OriginalListPrice
+  price_per_sqft                ClosePrice / LivingArea
+  DaysOnMarket                  raw field (kept as is)
+  Year, Month, YrMo             derived from CloseDate
+  listing_to_contract_days      PurchaseContractDate - ListingContractDate
+  contract_to_close_days        CloseDate - PurchaseContractDate
+  school_district               spatial join on Latitude/Longitude
+
+
+Segment analysis: summary statistics grouped by
+    - PropertyType and PropertySubType
+    - CountyOrParish and MLSAreaMajor
+    - ListOfficeName and BuyerOfficeName 
+
+'''
+
 import glob
 import os
  
