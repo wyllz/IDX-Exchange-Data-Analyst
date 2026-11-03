@@ -1,6 +1,14 @@
 '''
-week 2 dataset structuring and validation
+Week 2: Dataset Structuring and Validation
 
+Fulfils the deliverables:
+    - unique property types found and the filtering logic applied
+    - null-count summary table + missing value report flagging columns >90% null
+    - numeric distribution summary (min, max, mean, median, percentiles)
+    for ClosePrice, LivingArea and DaysOnMarket (plus the other key fields)
+    - histograms and boxplots for the key numeric fields (saved to figures/)
+    - answers to the handbook's suggested EDA questions
+    - saves the filtered dataset as a new CSV
 
 '''
 

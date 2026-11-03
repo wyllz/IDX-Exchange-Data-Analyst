@@ -1,3 +1,31 @@
+'''
+week 4-5: Data Cleaning and Preperations
+
+Turns the Weeks 2-3 enriched datasets into cleaned, analysis-ready CSVs and
+documents every transformation and why.
+
+1. Load sold_with_rates.csv and listings_with_rates.csv (Weeks 2-3 output)
+2. Remove unnecessary or redundant columns
+    - duplicate columns created by the extraction script ("Name.1")
+    - non-core columns more than 90% null (same rule as 02_eda.py)
+3. Convert date fields to datetime and make sure numeric fields are numeric
+4. Remove exact duplicate rows
+5. Remove repeated ListingKeys (keep the latest record)
+6. Handle missing values
+    - drop rows missing the fields the dataset cannot work without
+        (Sold: ClosePrice, CloseDate; Listings: ListPrice, ListingContractDate)
+    - leave other missing values as NaN (no imputation), so averages are
+        not distorted by made-up values
+7. Flag invalid numeric values (ClosePrice <= 0, LivingArea <= 0,
+    DaysOnMarket < 0, negative bedrooms or bathrooms) and remove them from
+    the cleaned dataset
+8. Date consistency flags: listing_after_close_flag, purchase_after_close_flag,
+    negative_timeline_flag (kept as flags, rows not removed)
+9. Geographic flags: missing, zero, positive-longitude and out-of-state
+    coordinates (kept as flags, rows not removed)
+10. Save the full flagged datasets and the cleaned datasets
+'''
+
 import os
  
 import pandas as pd

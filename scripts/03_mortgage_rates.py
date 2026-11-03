@@ -1,3 +1,15 @@
+'''
+Week 3: Mortgage Rate Enrichment
+
+Fulfills week 3 deliverables:
+    - Fetches the MORTGAGE30US series (30-year fixed rate) directly from FRED
+    - Resamples it from weekly to monthly averages
+    - Merges it onto the combined Sold and Listings datasets using a year_month key 
+      (Sold keys off CloseDate, Listings keys off ListingContractDate)
+    - Validates that no rate values are null after the merge
+    - Saves both enriched datasets as new CSVs
+'''
+
 import os
 import pandas as pd
 
