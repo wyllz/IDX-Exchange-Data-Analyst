@@ -4,13 +4,13 @@ week 4-5: Data Cleaning and Preperations
 Turns the Weeks 2-3 enriched datasets into cleaned, analysis-ready CSVs and
 documents every transformation and why.
 
-1. Load sold_with_rates.csv and listings_with_rates.csv (Weeks 2-3 output)
+1. Load sold_with_rates.csv and listings_with_rates.csv 
 2. Remove unnecessary or redundant columns
-    - duplicate columns created by the extraction script ("Name.1")
-    - non-core columns more than 90% null (same rule as 02_eda.py)
+    - duplicate columns created by the extraction script
+    - non-core columns more than 90% null
 3. Convert date fields to datetime and make sure numeric fields are numeric
 4. Remove exact duplicate rows
-5. Remove repeated ListingKeys (keep the latest record)
+5. Remove repeated ListingKeys
 6. Handle missing values
     - drop rows missing the fields the dataset cannot work without
         (Sold: ClosePrice, CloseDate; Listings: ListPrice, ListingContractDate)
