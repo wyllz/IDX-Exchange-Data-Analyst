@@ -1,3 +1,10 @@
+'''
+Week 1: Monthly Dataset Aggregation
+
+Combines every monthly CRMLS files from Janurary 2024 through the  most September 2026 into two 
+datasets (Sold and Listings), keeps only Residential property types and saves both as new CSVS
+'''
+
 import os
 from datetime import date
 

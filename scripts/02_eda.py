@@ -1,3 +1,10 @@
+'''
+week 2 dataset structuring and validation
+
+
+'''
+
+
 import glob
 import os
 
