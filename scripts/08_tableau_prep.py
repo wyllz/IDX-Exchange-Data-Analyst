@@ -20,8 +20,9 @@ LISTINGS_IN = os.path.join(DATA_DIR, "listings_clean.csv")
  
 START_MONTH = pd.Period("2024-01", freq="M")
 TOP_N = 100
+RATIO_RANGE = (0.5, 2.0)  # plausible close-to-original-list ratios
  
-# Columns each Tableau data source keeps. Missing ones are skipped with a note.
+# columns each Tableau data source keeps
 GEO_COLUMNS = ["City", "CountyOrParish", "PostalCode", "PropertySubType"]
 SOLD_COLUMNS = [
     "ListingKey", "CloseDate", "YrMo", "Year", "Month",
@@ -40,22 +41,17 @@ LISTING_COLUMNS = [
     *GEO_COLUMNS, "MLSAreaMajor", "Latitude", "Longitude",
     "ListAgentFullName", "ListOfficeName", "MlsStatus", "rate_30yr_fixed",
 ]
-
-
+ 
 pd.set_option("display.float_format", "{:,.2f}".format)
 pd.set_option("display.width", 200)
-
+ 
+ 
 def section(title):
     print("\n" + "=" * 70)
     print(title)
     print("=" * 70)
-
-
-def section(title):
-    print("\n" + "=" * 70)
-    print(title)
-    print("=" * 70)
-
+ 
+ 
 def keep_columns(df, wanted, name):
     present = [c for c in wanted if c in df.columns]
     missing = [c for c in wanted if c not in df.columns]
@@ -68,7 +64,8 @@ def clean_zip(series):
     """Zip codes are labels: 5-character text so Tableau maps them as postal codes."""
     s = series.astype("string").str.extract(r"(\d{5})", expand=False)
     return s
-
+ 
+ 
 def last_completed_month():
     return pd.Period(date.today(), freq="M") - 1
  
@@ -86,7 +83,6 @@ def prep_sold(end):
     df = df[in_window(month, end)].copy()
     print(f"  Kept closings from {START_MONTH} to {end}: {before:,} -> {len(df):,} rows")
  
-    # Week 6 already built these; rebuild only if an older file is missing them
     df["YrMo"] = df["CloseDate"].dt.strftime("%Y-%m")
     df["Year"] = df["CloseDate"].dt.year
     df["Month"] = df["CloseDate"].dt.month
@@ -135,9 +131,14 @@ def monthly_checks(sold, listings):
     monthly = typical.groupby("YrMo").agg(
         median_close_price=("ClosePrice", "median"),
         avg_days_on_market=("DaysOnMarket", "mean"),
-        avg_close_to_original_list_ratio=("close_to_original_list_ratio", "mean"),
         closed_sales_filtered=("ClosePrice", "size"),
     )
+    ratio = typical["close_to_original_list_ratio"]
+    plausible = ratio.between(*RATIO_RANGE)
+    print(f"  Ratios outside {RATIO_RANGE[0]} to {RATIO_RANGE[1]} left out of the average ratio: "
+          f"{int((ratio.notna() & ~plausible).sum()):,} (max seen: {ratio.max():,.1f})")
+    monthly.insert(2, "avg_close_to_original_list_ratio",
+                   typical[plausible].groupby("YrMo")["close_to_original_list_ratio"].mean())
     monthly["closed_sales_all"] = sold.groupby("YrMo").size()
     monthly["new_listings"] = listings.groupby("YrMo").size()
     monthly = monthly.fillna({"new_listings": 0, "closed_sales_all": 0})
@@ -219,7 +220,7 @@ def main():
     print(monthly.to_string())
     print(f"  Saved {path}")
  
-    # Small month-to-month dips at the end usually mean late-reported sales
+    # small month-to-month dips at the end usually mean late-reported sales
     if len(monthly) >= 2:
         last, prev = monthly.iloc[-1], monthly.iloc[-2]
         if last["closed_sales_all"] < 0.8 * prev["closed_sales_all"]:
