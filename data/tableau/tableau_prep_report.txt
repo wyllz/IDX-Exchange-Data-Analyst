@@ -1,0 +1,11 @@
+WEEK 8 TABLEAU PREP - 2026-11-09
+
+Sold months: 2024-01 to 2026-03 (27); missing: ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10']
+Listings months: 2024-01 to 2026-04 (28); missing: ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10']
+Sales without a valid zip: 7
+Sold rows: 396,946 (not outliers: 334,986)
+Listings rows: 546,636
+Latest month 2026-03: median close price $789,000, closed sales 15,650, new listings 25,535
+
+Outlier rule: market_analysis.twbx filters any_outlier_flag = False; competitive_analysis.twbx keeps every sale so volume is not understated.
+New listings are counted by ListingContractDate month; closed sales by CloseDate month.
