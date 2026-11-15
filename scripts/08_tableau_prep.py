@@ -10,19 +10,21 @@ Inputs (data/processed/):
 
 import os
 from datetime import date
- 
+
 import pandas as pd
- 
+
 DATA_DIR = "data/processed"
 OUT_DIR = "data/tableau"
 SOLD_IN = os.path.join(DATA_DIR, "sold_outliers_flagged.csv")
 LISTINGS_IN = os.path.join(DATA_DIR, "listings_clean.csv")
- 
+
 START_MONTH = pd.Period("2024-01", freq="M")
 TOP_N = 100
 RATIO_RANGE = (0.5, 2.0)  # plausible close-to-original-list ratios
- 
-# columns each Tableau data source keeps
+PRICE_RATIO_RANGE = (0.5, 2.0)  # plausible ClosePrice / ListPrice
+MAX_CLOSE_PRICE = 100_000_000  # above this a residential sale is treated as a typo
+
+# Columns each Tableau data source keeps
 GEO_COLUMNS = ["City", "CountyOrParish", "PostalCode", "PropertySubType"]
 SOLD_COLUMNS = [
     "ListingKey", "CloseDate", "YrMo", "Year", "Month",
@@ -33,7 +35,7 @@ SOLD_COLUMNS = [
     *GEO_COLUMNS, "MLSAreaMajor", "Latitude", "Longitude",
     "ListAgentFullName", "ListOfficeName", "BuyerOfficeName",
     "rate_30yr_fixed", "school_district",
-    "any_outlier_flag", "invalid_coords_flag",
+    "any_outlier_flag", "price_error_flag", "invalid_coords_flag",
 ]
 LISTING_COLUMNS = [
     "ListingKey", "ListingContractDate", "ListPrice", "OriginalListPrice",
@@ -41,39 +43,39 @@ LISTING_COLUMNS = [
     *GEO_COLUMNS, "MLSAreaMajor", "Latitude", "Longitude",
     "ListAgentFullName", "ListOfficeName", "MlsStatus", "rate_30yr_fixed",
 ]
- 
+
 pd.set_option("display.float_format", "{:,.2f}".format)
 pd.set_option("display.width", 200)
- 
- 
+
+
 def section(title):
     print("\n" + "=" * 70)
     print(title)
     print("=" * 70)
- 
- 
+
+
 def keep_columns(df, wanted, name):
     present = [c for c in wanted if c in df.columns]
     missing = [c for c in wanted if c not in df.columns]
     if missing:
         print(f"  {name}: columns not found, skipped: {missing}")
     return df[present].copy()
- 
- 
+
+
 def clean_zip(series):
     """Zip codes are labels: 5-character text so Tableau maps them as postal codes."""
     s = series.astype("string").str.extract(r"(\d{5})", expand=False)
     return s
- 
- 
+
+
 def last_completed_month():
     return pd.Period(date.today(), freq="M") - 1
- 
- 
+
+
 def in_window(month, end):
     return (month >= START_MONTH) & (month <= end)
- 
- 
+
+
 def prep_sold(end):
     df = pd.read_csv(SOLD_IN, low_memory=False)
     print(f"Loaded {SOLD_IN}: {len(df):,} rows")
@@ -82,7 +84,7 @@ def prep_sold(end):
     before = len(df)
     df = df[in_window(month, end)].copy()
     print(f"  Kept closings from {START_MONTH} to {end}: {before:,} -> {len(df):,} rows")
- 
+
     df["YrMo"] = df["CloseDate"].dt.strftime("%Y-%m")
     df["Year"] = df["CloseDate"].dt.year
     df["Month"] = df["CloseDate"].dt.month
@@ -91,13 +93,27 @@ def prep_sold(end):
               "Treating every row as not an outlier.")
         df["any_outlier_flag"] = False
     df["any_outlier_flag"] = df["any_outlier_flag"].astype(str).str.lower().eq("true")
- 
+
+    # Price error rule 
+    close = pd.to_numeric(df["ClosePrice"], errors="coerce")
+    listed = pd.to_numeric(df["ListPrice"], errors="coerce") if "ListPrice" in df.columns else pd.Series(float("nan"), index=df.index)
+    ratio = close / listed.where(listed > 0)
+    df["price_error_flag"] = ((ratio.notna() & ~ratio.between(*PRICE_RATIO_RANGE))
+                              | (close > MAX_CLOSE_PRICE))
+    errors = df[df["price_error_flag"]].sort_values("ClosePrice", ascending=False)
+    cols = [c for c in ["ListingKey", "CloseDate", "ClosePrice", "ListPrice", "OriginalListPrice",
+                        "LivingArea", "City", "ListAgentFullName", "ListOfficeName"] if c in df.columns]
+    print(f"  price_error_flag: {len(errors):,} sales ({len(errors) / max(len(df), 1):.2%}). Largest 15:")
+    print(errors[cols].head(15).to_string(index=False))
+    os.makedirs(OUT_DIR, exist_ok=True)
+    errors[cols].to_csv(os.path.join(OUT_DIR, "check_price_errors.csv"), index=False)
+
     df = keep_columns(df, SOLD_COLUMNS, "Sold")
     if "PostalCode" in df.columns:
         df["PostalCode"] = clean_zip(df["PostalCode"])
     return df
- 
- 
+
+
 def prep_listings(end):
     df = pd.read_csv(LISTINGS_IN, low_memory=False)
     print(f"Loaded {LISTINGS_IN}: {len(df):,} rows")
@@ -106,14 +122,14 @@ def prep_listings(end):
     before = len(df)
     df = df[in_window(month, end)].copy()
     print(f"  Kept listings dated {START_MONTH} to {end}: {before:,} -> {len(df):,} rows")
- 
+
     df = keep_columns(df, LISTING_COLUMNS, "Listings")
     df["YrMo"] = df["ListingContractDate"].dt.strftime("%Y-%m")
     if "PostalCode" in df.columns:
         df["PostalCode"] = clean_zip(df["PostalCode"])
     return df
- 
- 
+
+
 def market_activity(sold, listings):
     """Stack sales and new listings so one Tableau source drives the comparison chart."""
     cols = ["ListingKey", "YrMo", *GEO_COLUMNS]
@@ -124,8 +140,8 @@ def market_activity(sold, listings):
         activity_type="New Listing", activity_date=listings["ListingContractDate"],
         price=listings["ListPrice"])
     return pd.concat([s, l], ignore_index=True)
- 
- 
+
+
 def monthly_checks(sold, listings):
     typical = sold[~sold["any_outlier_flag"]]
     monthly = typical.groupby("YrMo").agg(
@@ -143,8 +159,8 @@ def monthly_checks(sold, listings):
     monthly["new_listings"] = listings.groupby("YrMo").size()
     monthly = monthly.fillna({"new_listings": 0, "closed_sales_all": 0})
     return monthly.round(3)
- 
- 
+
+
 def top_n(sold, by, label):
     """Top N by volume and by units. Every row counts (see the outlier decision)."""
     named = sold[sold[by].notna() & (sold[by].astype(str).str.strip() != "")]
@@ -164,8 +180,8 @@ def top_n(sold, by, label):
     print(out.head(10).to_string())
     print(f"  Saved {path} ({len(out):,} rows: in the top {TOP_N} by volume or by units)")
     return out
- 
- 
+
+
 def zip_summary(sold):
     z = sold.dropna(subset=["PostalCode"]).groupby("PostalCode").agg(
         city=("City", lambda s: s.mode().iat[0] if not s.mode().empty else None),
@@ -174,13 +190,13 @@ def zip_summary(sold):
         homes_sold=("ClosePrice", "size"),
     ).sort_values("homes_sold", ascending=False)
     return z
- 
- 
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     end = last_completed_month()
     report = [f"WEEK 8 TABLEAU PREP - {date.today():%Y-%m-%d}", ""]
- 
+
     section("1. SOLD DATA SOURCE")
     sold = prep_sold(end)
     path = os.path.join(OUT_DIR, "tableau_sold.csv")
@@ -188,19 +204,19 @@ def main():
     n_typical = int((~sold["any_outlier_flag"]).sum())
     print(f"  Saved {path}: {len(sold):,} rows, {sold.shape[1]} columns "
           f"({n_typical:,} not flagged as outliers)")
- 
+
     section("2. LISTINGS DATA SOURCE")
     listings = prep_listings(end)
     path = os.path.join(OUT_DIR, "tableau_listings.csv")
     listings.to_csv(path, index=False)
     print(f"  Saved {path}: {len(listings):,} rows, {listings.shape[1]} columns")
- 
+
     activity = market_activity(sold, listings)
     path = os.path.join(OUT_DIR, "tableau_market_activity.csv")
     activity.to_csv(path, index=False)
     print(f"  Saved {path}: {len(activity):,} rows "
           f"({activity['activity_type'].value_counts().to_dict()})")
- 
+
     section("3. DATE COVERAGE")
     sold_months = sorted(sold["YrMo"].dropna().unique())
     list_months = sorted(listings["YrMo"].dropna().unique())
@@ -212,26 +228,29 @@ def main():
         span = f"{months[0]} to {months[-1]}" if months else "none"
         print(f"  {name}: {span} ({len(months)} months), missing: {gaps[name] or 'none'}")
         report.append(f"{name} months: {span} ({len(months)}); missing: {gaps[name] or 'none'}")
- 
+
     section("4. CHECK TABLE - market_analysis.twbx (no filters, outliers excluded)")
     monthly = monthly_checks(sold, listings)
     path = os.path.join(OUT_DIR, "check_monthly_market.csv")
     monthly.to_csv(path)
     print(monthly.to_string())
     print(f"  Saved {path}")
- 
-    # small month-to-month dips at the end usually mean late-reported sales
+
+    # Small month-to-month dips at the end usually mean late-reported sales
     if len(monthly) >= 2:
         last, prev = monthly.iloc[-1], monthly.iloc[-2]
         if last["closed_sales_all"] < 0.8 * prev["closed_sales_all"]:
             print(f"  NOTE: {monthly.index[-1]} has {last['closed_sales_all']:,.0f} sales vs "
                   f"{prev['closed_sales_all']:,.0f} the month before. If the data was pulled "
                   "early in the month, recent closings may still be missing.")
- 
-    section("5. CHECK TABLES - competitive_analysis.twbx (all rows)")
+
+    section("5. CHECK TABLES - competitive_analysis.twbx (all rows except price errors)")
+    sold_all = sold
+    sold = sold_all[~sold_all["price_error_flag"]]
+    print(f"  Left out {len(sold_all) - len(sold):,} sales with price_error_flag = True")
     top_n(sold, "ListAgentFullName", "agents")
     top_n(sold, "ListOfficeName", "offices")
- 
+
     if "PostalCode" in sold.columns:
         zips = zip_summary(sold)
         path = os.path.join(OUT_DIR, "check_zip_summary.csv")
@@ -242,10 +261,11 @@ def main():
         missing_zip = sold["PostalCode"].isna().sum()
         print(f"  Sales without a valid 5-digit zip (left off the heat maps): {missing_zip:,}")
         report.append(f"Sales without a valid zip: {missing_zip:,}")
- 
+
     section("6. REPORT")
     report += [
-        f"Sold rows: {len(sold):,} (not outliers: {n_typical:,})",
+        f"Sold rows: {len(sold_all):,} (not outliers: {n_typical:,}; "
+        f"price errors: {int(sold_all['price_error_flag'].sum()):,})",
         f"Listings rows: {len(listings):,}",
     ]
     if len(monthly):
@@ -257,14 +277,14 @@ def main():
     report += [
         "",
         "Outlier rule: market_analysis.twbx filters any_outlier_flag = False; "
-        "competitive_analysis.twbx keeps every sale so volume is not understated.",
+        "competitive_analysis.twbx keeps every sale except price_error_flag = True.",
         "New listings are counted by ListingContractDate month; closed sales by CloseDate month.",
     ]
     text = "\n".join(report)
     with open(os.path.join(OUT_DIR, "tableau_prep_report.txt"), "w") as f:
         f.write(text + "\n")
     print(text)
- 
- 
+
+
 if __name__ == "__main__":
     main()
