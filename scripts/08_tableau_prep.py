@@ -4,8 +4,8 @@ Week 8 Tableau dashboard preperation
 This script turns the week 4-7 outputs into small, Tableau-friendly CSVs and computes the numbers each graph should show
 
 Inputs (data/processed/):
-    sold_outliers_flagged.csv week 7: every cleaned sale, with outlier flags
-    listings_clean.csv        week 4-5: cleaned listings
+  sold_outliers_flagged.csv  Week 7: every cleaned sale, with outlier flags
+  listings_clean.csv         Weeks 4-5: cleaned listings (for "new listings")
 """
 
 import os
@@ -284,7 +284,6 @@ def main():
     with open(os.path.join(OUT_DIR, "tableau_prep_report.txt"), "w") as f:
         f.write(text + "\n")
     print(text)
-
 
 if __name__ == "__main__":
     main()
