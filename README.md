@@ -409,12 +409,4 @@ Values below come from the script output and Tableau screenshots shared during t
 
 ---
 
-## Data confidentiality
-
-The MLS data and the intern handbook are confidential to the IDX Exchange program. This repository should hold code and documentation only:
-- Do not commit anything in `data/`, the raw CSVs, or FTP or API credentials.
-- Keep agent names, office names and individual addresses out of public material unless your supervisor approves.
-
----
-
 *IDX Exchange Data Analyst Internship · `William Zhang` · `Sep 2026 - Dec 2026`*
